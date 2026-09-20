@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.artifacts/
+artifacts/
+.vendor/
+.tools/
+playwright-report/
+test-results/
+.env*
+!.env.example
+public/assets/axie/*
+!public/assets/axie/.gitkeep
+music/
+public/assets/audio/lobby.mp3
+public/assets/audio/battle.mp3
+*.log
+*.tsbuildinfo

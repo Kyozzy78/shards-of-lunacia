@@ -1,0 +1,36 @@
+{
+  "name": "shards-of-lunacia",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "postinstall": "node scripts/setup-mixer-assets.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc -b --pretty false",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:smoke": "node scripts/smoke.mjs",
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "test:content": "node scripts/verify-mixer-content.mjs"
+  },
+  "dependencies": {
+    "@jaatster/threejs-axie-mixer3d-public": "github:jaatster/threejs-axie-mixer3d-public#812f0ee47066661f3b3d84a346d6a82f4758e1c0",
+    "three": "0.178.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.35.0",
+    "@types/three": "0.178.1",
+    "eslint": "9.35.0",
+    "globals": "16.3.0",
+    "playwright-core": "^1.63.0",
+    "typescript": "5.8.3",
+    "typescript-eslint": "8.42.0",
+    "vite": "7.1.5",
+    "vitest": "3.2.4"
+  }
+}
