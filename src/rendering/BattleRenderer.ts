@@ -100,6 +100,11 @@ export class BattleRenderer {
     this.cameraTarget.copy(a.lerp(b,.38));this.cameraTarget.y=.28;this.distance=Math.min(this.distance,8.2);this.canvas.dataset.cinematic='attack';
     const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:0xb8f7ff,transparent:true,opacity:1}));this.scene.add(line);this.effects.push({object:line,remaining:.35,duration:.35});
   }
+  shield(id:string, blocked=false):void {
+    const visual=this.unitVisuals.get(id);if(!visual)return;
+    const material=new THREE.MeshBasicMaterial({color:blocked?0xffd16e:0x62e9ff,transparent:true,opacity:.82,wireframe:true,depthWrite:false});
+    const shell=new THREE.Mesh(new THREE.IcosahedronGeometry(.72,2),material);shell.position.copy(visual.root.position).add(new THREE.Vector3(0,.68,0));shell.scale.setScalar(.35);this.scene.add(shell);this.effects.push({object:shell,remaining:.55,duration:.55});
+  }
   private damageText(position:THREE.Vector3,amount:number):void {
     const canvas=document.createElement('canvas');canvas.width=128;canvas.height=64;const ctx=canvas.getContext('2d')!;ctx.font='bold 42px sans-serif';ctx.textAlign='center';ctx.strokeStyle='#182133';ctx.lineWidth=7;ctx.strokeText(`−${amount}`,64,47);ctx.fillStyle='#fff0bc';ctx.fillText(`−${amount}`,64,47);
     const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,transparent:true}));sprite.position.copy(position).add(new THREE.Vector3(0,1.8,0));sprite.scale.set(1.4,.7,1);this.scene.add(sprite);this.effects.push({object:sprite,remaining:1.1,duration:1.1});
@@ -130,7 +135,7 @@ export class BattleRenderer {
     this.positionCamera();this.environment.update(this.time);
     if(this.motion){const motion=this.motion;const target=motion.points[motion.index]!;const current=motion.visual.root.position;const d=current.distanceTo(target);if(d<delta*4){current.copy(target);motion.index++;if(motion.index>=motion.points.length){this.motion=undefined;motion.visual.avatar?.play('idle');motion.done();}}else{motion.visual.root.rotation.y=Math.atan2(target.x-current.x,target.z-current.z);current.lerp(target,delta*4/d);}}
     for(const visual of this.unitVisuals.values())visual.avatar?.update(delta);
-    this.effects=this.effects.filter(effect=>{effect.remaining-=delta;const material=(effect.object as THREE.Sprite).material as THREE.Material;material.opacity=Math.max(0,effect.remaining/effect.duration);if(effect.object instanceof THREE.Sprite)effect.object.position.y+=delta*.5;if(effect.remaining<=0){this.scene.remove(effect.object);this.release(effect.object);return false;}return true;});
+    this.effects=this.effects.filter(effect=>{effect.remaining-=delta;const material=(effect.object as THREE.Sprite).material as THREE.Material;material.opacity=Math.max(0,effect.remaining/effect.duration);if(effect.object instanceof THREE.Sprite)effect.object.position.y+=delta*.5;if(effect.object instanceof THREE.Mesh&&effect.object.geometry.type==='IcosahedronGeometry')effect.object.scale.addScalar(delta*1.8);if(effect.remaining<=0){this.scene.remove(effect.object);this.release(effect.object);return false;}return true;});
     this.renderer.render(this.scene,this.camera);
     if(this.canvas.dataset.ready==='true'){const projected:Record<string,{x:number;y:number}>={};for(const key of this.reachable){const cell=this.cells.get(key)!;const p=cell.position.clone().project(this.camera);projected[key]={x:(p.x+1)*this.canvas.clientWidth/2,y:(1-p.y)*this.canvas.clientHeight/2};}this.canvas.dataset.reachableScreen=JSON.stringify(projected);}
   };
