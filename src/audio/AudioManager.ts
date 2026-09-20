@@ -1,5 +1,5 @@
 type MusicScene = 'lobby' | 'battle' | 'result';
-type SfxCue = 'select' | 'move' | 'attack' | 'guard' | 'block';
+type SfxCue = 'select' | 'move' | 'attack' | 'chimera-attack' | 'guard' | 'block';
 type AxieClass = 'Beast' | 'Bird' | 'Plant' | 'Reptile';
 
 /** Local user-supplied tracks. Playback begins only after an actual user gesture. */
@@ -11,9 +11,9 @@ export class AudioManager {
   private unlocked = false;
   private timer = 0;
   private context?: AudioContext;
-  private readonly originsSfx: Record<'Beast' | 'Bird' | 'Plant' | 'Reptile' | 'guard' | 'block', string> = {
+  private readonly originsSfx: Record<'Beast' | 'Bird' | 'Plant' | 'Reptile' | 'chimera-attack' | 'guard' | 'block', string> = {
     Beast: './assets/audio/origins/beast-attack.wav', Bird: './assets/audio/origins/bird-attack.wav', Plant: './assets/audio/origins/plant-attack.wav', Reptile: './assets/audio/origins/reptile-attack.wav',
-    guard: './assets/audio/origins/shield.wav', block: './assets/audio/origins/block.wav',
+    'chimera-attack': './assets/audio/origins/chimera-attack.wav', guard: './assets/audio/origins/shield.wav', block: './assets/audio/origins/block.wav',
   };
 
   constructor() {
@@ -34,7 +34,7 @@ export class AudioManager {
   }
   cue(kind:SfxCue, axieClass?: AxieClass):void {
     const ctx=this.context;if(!ctx||this.sfxVolume===0||document.hidden)return;
-    const source = kind === 'attack' && axieClass ? this.originsSfx[axieClass] : kind === 'guard' || kind === 'block' ? this.originsSfx[kind] : undefined;
+    const source = kind === 'attack' && axieClass ? this.originsSfx[axieClass] : kind === 'chimera-attack' || kind === 'guard' || kind === 'block' ? this.originsSfx[kind] : undefined;
     if (source) {
       const sound = new Audio(source); sound.volume = Math.min(1, this.sfxVolume * .72); sound.preload = 'auto';
       void sound.play().then(() => { document.documentElement.dataset.lastSfx = source; }).catch(() => { document.documentElement.dataset.audioStatus = 'sfx-playback-blocked'; });

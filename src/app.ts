@@ -75,7 +75,7 @@ export class App {
         ${([['crossing','01','The Shattered Crossing','Balanced ruins and cover.'],['canopy','02','The Verdant Canopy','Flanking lanes in dense growth.'],['citadel','03','The Sky Citadel','Tight high-ground corridors.']] as const).map(([id,no,name,description]) => `<button class="mission-card ${this.mission === id ? 'selected' : ''}" data-mission="${id}"><span>MISSION ${no}</span><b>${name}</b><small>${description}</small></button>`).join('')}
       </section>
       <section class="squad-cards">${players.map((u, index) => `<article class="squad-card accent-${index}">
-        <div class="portrait-orb mixer-portrait"><span>${u.axieClass}</span><small>OFFICIAL 3D MIXER</small></div>
+        <div class="portrait-orb mixer-portrait" aria-label="${u.axieClass} Axie 3D preview"></div>
         <span class="role">${u.axieClass} · ${u.role}</span><h3>${u.name}</h3><p>${u.ability.description}</p>
         <dl><div><dt>HP</dt><dd>${u.hp}</dd></div><div><dt>MOVE</dt><dd>${u.moveRange}</dd></div><div><dt>RANGE</dt><dd>${u.attackRange}</dd></div></dl>
         <div class="ability-chip"><b>${u.ability.name}</b><span>${u.ability.cost} AP</span></div>
@@ -88,8 +88,12 @@ export class App {
     const previewCanvas = this.root.querySelector<HTMLCanvasElement>('#squad-preview-canvas');
     const portraits = [...this.root.querySelectorAll<HTMLElement>('.mixer-portrait')];
     if (previewCanvas) {
-      this.squadPreview = new SquadPreviewRenderer(previewCanvas);
-      void this.squadPreview.load(players, portraits).catch((error: unknown) => {
+      const preview = new SquadPreviewRenderer(previewCanvas);
+      this.squadPreview = preview;
+      void preview.load(players, portraits).catch((error: unknown) => {
+        // Leaving the roster during an in-flight asset load disposes its store;
+        // that is an expected cancellation, not a game-facing error.
+        if (this.squadPreview !== preview) return;
         console.error('Unable to load squad preview models.', error);
         this.root.querySelectorAll('.mixer-portrait').forEach((portrait) => portrait.classList.add('preview-unavailable'));
       });
@@ -216,7 +220,7 @@ export class App {
       if (this.state.phase !== 'ENEMY_PHASE') break;
       for (let actionIndex = 0; actionIndex < 2; actionIndex += 1) {
         const current = getUnit(this.state, enemy.id); if (!current?.alive || current.ap < 1) break; const command = chooseEnemyAction(this.state, current); if (command.type === 'end-turn') break;
-        await this.delay(this.settings.reducedMotion ? 120 : 450); const target = command.type === 'attack' ? getUnit(this.state, command.targetId) : undefined; const result = applyCommand(this.state, command); if (result.error) break; if (command.type === 'move') { const path = findPath(this.state, current.cell, command.to, current.id); if (path && this.battleRenderer) await new Promise<void>((resolve) => this.battleRenderer!.moveUnit(current.id, path, resolve)); } if (command.type === 'attack') { this.battleRenderer?.attack(command.unitId, command.targetId); this.audio.cue('attack'); if (target?.guarding) this.audio.cue('block'); } this.state = result.state; this.status = this.state.events[0]?.text ?? 'Enemy acted.'; this.renderBattle();
+        await this.delay(this.settings.reducedMotion ? 120 : 450); const target = command.type === 'attack' ? getUnit(this.state, command.targetId) : undefined; const result = applyCommand(this.state, command); if (result.error) break; if (command.type === 'move') { const path = findPath(this.state, current.cell, command.to, current.id); if (path && this.battleRenderer) await new Promise<void>((resolve) => this.battleRenderer!.moveUnit(current.id, path, resolve)); } if (command.type === 'attack') { this.battleRenderer?.attack(command.unitId, command.targetId); this.audio.cue('chimera-attack'); if (target?.guarding) this.audio.cue('block'); } this.state = result.state; this.status = this.state.events[0]?.text ?? 'Enemy acted.'; this.renderBattle();
       }
     }
     if (this.state.phase === 'ENEMY_PHASE') this.state = beginPlayerPhase(this.state); this.enemyBusy = false; this.status = 'Your squad is ready. AP refreshed to 3.'; this.renderBattle();

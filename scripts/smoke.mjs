@@ -20,6 +20,7 @@ await page.screenshot({ path: 'artifacts/menu-1280x720.png' });
 await page.getByRole('button', { name: /Begin Mission/i }).click();
 await page.getByRole('heading', { name: 'Choose your approach' }).waitFor();
 const mixerCards = await page.locator('.mixer-portrait').count();
+const mixerLabelCount = await page.getByText('OFFICIAL 3D MIXER', { exact: true }).count();
 await page.getByRole('button', { name: /The Verdant Canopy/i }).click();
 const startBox = await page.getByRole('button', { name: /Start Mission/i }).boundingBox();
 if (!startBox || startBox.y + startBox.height > 720) throw new Error('Start Mission is not visible at the desktop viewport.');
@@ -86,6 +87,8 @@ await page.screenshot({ path: 'artifacts/battle-1920x1080.png' });
 const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
 await mobile.goto('http://127.0.0.1:4173/', { waitUntil: 'networkidle', timeout: 60_000 });
 await mobile.getByRole('button', { name: /Begin Mission/i }).click();
+const mobileScroll = await mobile.locator('.squad-screen').evaluate((screen) => ({ clientHeight: screen.clientHeight, scrollHeight: screen.scrollHeight }));
+await mobile.getByRole('button', { name: /Start Mission/i }).scrollIntoViewIfNeeded();
 const mobileStartBox = await mobile.getByRole('button', { name: /Start Mission/i }).boundingBox();
 if (!mobileStartBox || mobileStartBox.y < 0 || mobileStartBox.y + mobileStartBox.height > 844) throw new Error('Start Mission is not visible at the mobile viewport.');
 await mobile.screenshot({ path: 'artifacts/squad-mobile-390x844.png' });
@@ -98,6 +101,8 @@ console.log(JSON.stringify({
   canvasSize,
   axieSources,
   mixerCards,
+  mixerLabelCount,
+  mobileScroll,
   mapAssetsButtonCount,
   nativeDialogCount,
   musicScene,
@@ -115,4 +120,4 @@ console.log(JSON.stringify({
 
 await mobile.close();
 await browser.close();
-if (!webgl || !canvasSize || !axieSources?.includes('kibo:mixer3d') || !axieSources?.includes('xia:mixer3d') || !axieSources?.includes('bing:mixer3d') || !axieSources?.includes('riptide:mixer3d') || !axieSources?.includes('moss:mixer3d') || mixerCards !== 5 || mapAssetsButtonCount !== 0 || nativeDialogCount !== 0 || apBefore !== 3 || apAfter !== 2 || musicScene !== 'battle' || audioStatus || savedMusic !== 0 || consoleErrors.length || failedRequests.length) process.exitCode = 1;
+if (!webgl || !canvasSize || !axieSources?.includes('kibo:mixer3d') || !axieSources?.includes('xia:mixer3d') || !axieSources?.includes('bing:mixer3d') || !axieSources?.includes('riptide:mixer3d') || !axieSources?.includes('moss:mixer3d') || mixerCards !== 5 || mixerLabelCount !== 0 || mobileScroll.scrollHeight <= mobileScroll.clientHeight || mapAssetsButtonCount !== 0 || nativeDialogCount !== 0 || apBefore !== 3 || apAfter !== 2 || musicScene !== 'battle' || audioStatus || savedMusic !== 0 || consoleErrors.length || failedRequests.length) process.exitCode = 1;

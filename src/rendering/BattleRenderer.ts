@@ -8,6 +8,14 @@ import { LunacianEnvironment } from './LunacianEnvironment';
 
 interface UnitVisual { root: THREE.Group; avatar?: AxieAvatar; hp: THREE.Sprite; lastHp: number }
 interface Motion { visual:UnitVisual; points:THREE.Vector3[]; index:number; done:()=>void }
+interface Effect {
+  object: THREE.Object3D;
+  remaining: number;
+  duration: number;
+  kind?: 'projectile' | 'impact' | 'shield' | 'damage';
+  from?: THREE.Vector3;
+  to?: THREE.Vector3;
+}
 
 export class BattleRenderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -36,7 +44,7 @@ export class BattleRenderer {
   private loading?:Promise<void>;
   private disposed=false;
   private time=0;
-  private effects:Array<{object:THREE.Object3D;remaining:number;duration:number}>=[];
+  private effects:Effect[]=[];
   private cinematic?: { remaining:number; restoreTarget:THREE.Vector3; restoreDistance:number };
   onCell?:(x:number,z:number)=>void;
   onUnit?:(id:string)=>void;
@@ -98,16 +106,25 @@ export class BattleRenderer {
     // A short XCOM-style push-in puts the acting Axie and target in frame.
     this.cinematic={remaining:1.05,restoreTarget:this.cameraTarget.clone(),restoreDistance:this.distance};
     this.cameraTarget.copy(a.lerp(b,.38));this.cameraTarget.y=.28;this.distance=Math.min(this.distance,8.2);this.canvas.dataset.cinematic='attack';
-    const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:0xb8f7ff,transparent:true,opacity:1}));this.scene.add(line);this.effects.push({object:line,remaining:.35,duration:.35});
+    const enemy=this.state?.units.find(unit=>unit.id===id)?.team==='enemy';
+    const color=enemy?0xff5b7e:0x7ff5ff;
+    const bolt=new THREE.Group();
+    const core=new THREE.Mesh(new THREE.IcosahedronGeometry(.15,1),new THREE.MeshBasicMaterial({color,transparent:true,opacity:1,depthWrite:false}));
+    const halo=new THREE.Mesh(new THREE.TorusGeometry(.19,.025,6,16),new THREE.MeshBasicMaterial({color:enemy?0xffbd57:0xd6fbff,transparent:true,opacity:.9,depthWrite:false}));halo.rotation.x=Math.PI/2;bolt.add(core,halo);bolt.position.copy(a);this.scene.add(bolt);
+    this.effects.push({object:bolt,remaining:.42,duration:.42,kind:'projectile',from:a,to:b});
+    const impact=new THREE.Group();
+    const flash=new THREE.Mesh(new THREE.SphereGeometry(.22,12,8),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.8,depthWrite:false}));
+    const shock=new THREE.Mesh(new THREE.TorusGeometry(.16,.035,6,20),new THREE.MeshBasicMaterial({color:enemy?0xffbd57:0xd6fbff,transparent:true,opacity:.85,depthWrite:false}));shock.rotation.x=Math.PI/2;impact.add(flash,shock);impact.position.copy(b);impact.visible=false;this.scene.add(impact);
+    this.effects.push({object:impact,remaining:.6,duration:.6,kind:'impact',from:a,to:b});
   }
   shield(id:string, blocked=false):void {
     const visual=this.unitVisuals.get(id);if(!visual)return;
     const material=new THREE.MeshBasicMaterial({color:blocked?0xffd16e:0x62e9ff,transparent:true,opacity:.82,wireframe:true,depthWrite:false});
-    const shell=new THREE.Mesh(new THREE.IcosahedronGeometry(.72,2),material);shell.position.copy(visual.root.position).add(new THREE.Vector3(0,.68,0));shell.scale.setScalar(.35);this.scene.add(shell);this.effects.push({object:shell,remaining:.55,duration:.55});
+    const shell=new THREE.Mesh(new THREE.IcosahedronGeometry(.72,2),material);shell.position.copy(visual.root.position).add(new THREE.Vector3(0,.68,0));shell.scale.setScalar(.35);this.scene.add(shell);this.effects.push({object:shell,remaining:.55,duration:.55,kind:'shield'});
   }
   private damageText(position:THREE.Vector3,amount:number):void {
     const canvas=document.createElement('canvas');canvas.width=128;canvas.height=64;const ctx=canvas.getContext('2d')!;ctx.font='bold 42px sans-serif';ctx.textAlign='center';ctx.strokeStyle='#182133';ctx.lineWidth=7;ctx.strokeText(`−${amount}`,64,47);ctx.fillStyle='#fff0bc';ctx.fillText(`−${amount}`,64,47);
-    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,transparent:true}));sprite.position.copy(position).add(new THREE.Vector3(0,1.8,0));sprite.scale.set(1.4,.7,1);this.scene.add(sprite);this.effects.push({object:sprite,remaining:1.1,duration:1.1});
+    const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false,transparent:true}));sprite.position.copy(position).add(new THREE.Vector3(0,1.8,0));sprite.scale.set(1.4,.7,1);this.scene.add(sprite);this.effects.push({object:sprite,remaining:1.1,duration:1.1,kind:'damage'});
   }
   centerOn(unit:Unit):void{this.cameraTarget.set(unit.cell.x,0,unit.cell.z);}
   rotate(amount:number):void{this.yaw+=amount;}
@@ -135,10 +152,18 @@ export class BattleRenderer {
     this.positionCamera();this.environment.update(this.time);
     if(this.motion){const motion=this.motion;const target=motion.points[motion.index]!;const current=motion.visual.root.position;const d=current.distanceTo(target);if(d<delta*4){current.copy(target);motion.index++;if(motion.index>=motion.points.length){this.motion=undefined;motion.visual.avatar?.play('idle');motion.done();}}else{motion.visual.root.rotation.y=Math.atan2(target.x-current.x,target.z-current.z);current.lerp(target,delta*4/d);}}
     for(const visual of this.unitVisuals.values())visual.avatar?.update(delta);
-    this.effects=this.effects.filter(effect=>{effect.remaining-=delta;const material=(effect.object as THREE.Sprite).material as THREE.Material;material.opacity=Math.max(0,effect.remaining/effect.duration);if(effect.object instanceof THREE.Sprite)effect.object.position.y+=delta*.5;if(effect.object instanceof THREE.Mesh&&effect.object.geometry.type==='IcosahedronGeometry')effect.object.scale.addScalar(delta*1.8);if(effect.remaining<=0){this.scene.remove(effect.object);this.release(effect.object);return false;}return true;});
+    this.effects=this.effects.filter(effect=>{
+      effect.remaining-=delta;const progress=THREE.MathUtils.clamp(1-effect.remaining/effect.duration,0,1);const opacity=Math.max(0,1-progress);
+      if(effect.kind==='projectile'&&effect.from&&effect.to){const travel=THREE.MathUtils.smoothstep(progress,0,1);effect.object.position.lerpVectors(effect.from,effect.to,travel);effect.object.rotation.y+=delta*14;effect.object.rotation.z+=delta*9;}
+      if(effect.kind==='impact'){effect.object.visible=progress>.45;effect.object.scale.setScalar(.35+Math.max(0,(progress-.45)/.55)*2.5);effect.object.rotation.y+=delta*10;}
+      if(effect.kind==='shield'){effect.object.scale.addScalar(delta*1.8);effect.object.rotation.y+=delta*2.5;}
+      if(effect.kind==='damage'&&effect.object instanceof THREE.Sprite)effect.object.position.y+=delta*.5;
+      this.setEffectOpacity(effect.object,opacity);if(effect.remaining<=0){this.scene.remove(effect.object);this.release(effect.object);return false;}return true;
+    });
     this.renderer.render(this.scene,this.camera);
     if(this.canvas.dataset.ready==='true'){const projected:Record<string,{x:number;y:number}>={};for(const key of this.reachable){const cell=this.cells.get(key)!;const p=cell.position.clone().project(this.camera);projected[key]={x:(p.x+1)*this.canvas.clientWidth/2,y:(1-p.y)*this.canvas.clientHeight/2};}this.canvas.dataset.reachableScreen=JSON.stringify(projected);}
   };
+  private setEffectOpacity(root:THREE.Object3D, opacity:number):void {root.traverse(object=>{const material=(object as THREE.Mesh).material;if(!material)return;for(const entry of Array.isArray(material)?material:[material]){if('opacity' in entry){entry.transparent=true;entry.opacity=opacity;}}});}
   private release(root:THREE.Object3D):void{root.traverse(object=>{const mesh=object as THREE.Mesh;mesh.geometry?.dispose();if(mesh.material)for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material]){for(const value of Object.values(material))if(value instanceof THREE.Texture)value.dispose();material.dispose();}});}
   dispose():void{this.disposed=true;cancelAnimationFrame(this.animationId);this.motion=undefined;this.canvas.removeEventListener('pointerup',this.pick);this.canvas.removeEventListener('pointermove',this.hover);this.canvas.removeEventListener('pointerleave',this.clearHover);this.canvas.removeEventListener('contextmenu',this.cancel);this.canvas.removeEventListener('wheel',this.zoom);window.removeEventListener('keydown',this.keydown);window.removeEventListener('resize',this.resize);for(const visual of this.unitVisuals.values())visual.avatar?.dispose();this.avatarFactory.dispose();this.environment.dispose();this.release(this.scene);this.renderer.dispose();}
 }
