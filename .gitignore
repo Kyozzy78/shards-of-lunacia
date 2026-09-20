@@ -15,3 +15,7 @@ public/assets/audio/lobby.mp3
 public/assets/audio/battle.mp3
 *.log
 *.tsbuildinfo
+
+# Private project prompts and planning specs
+/specs/
+/SHARDS_OF_LUNACIA_CODEX_MASTER_PROMPT.md
